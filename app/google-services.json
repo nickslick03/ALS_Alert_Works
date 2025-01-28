@@ -1,0 +1,155 @@
+{
+  "project_info": {
+    "project_number": "664350839106",
+    "firebase_url": "https://alsalert-default-rtdb.firebaseio.com",
+    "project_id": "alsalert",
+    "storage_bucket": "alsalert.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664350839106:android:6d3bab20886f18bd0cf8db",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "664350839106-c3s6ddbj1js0m8ru2vod6q1nov1jffmc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBci2m3fblze-gT-e_3AklRhIExFds3tks"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "664350839106-c3s6ddbj1js0m8ru2vod6q1nov1jffmc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "664350839106-3dafc02usp8b1sdhdu33kpr84br30f1m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "SamehF.ALSAlert"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664350839106:android:4c815e1411f8294a0cf8db",
+        "android_client_info": {
+          "package_name": "com.example.test"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "664350839106-c3s6ddbj1js0m8ru2vod6q1nov1jffmc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBci2m3fblze-gT-e_3AklRhIExFds3tks"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "664350839106-c3s6ddbj1js0m8ru2vod6q1nov1jffmc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "664350839106-3dafc02usp8b1sdhdu33kpr84br30f1m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "SamehF.ALSAlert"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664350839106:android:2c22112186a01a4c0cf8db",
+        "android_client_info": {
+          "package_name": "com.samehf.alsalert"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "664350839106-c3s6ddbj1js0m8ru2vod6q1nov1jffmc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBci2m3fblze-gT-e_3AklRhIExFds3tks"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "664350839106-c3s6ddbj1js0m8ru2vod6q1nov1jffmc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "664350839106-3dafc02usp8b1sdhdu33kpr84br30f1m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "SamehF.ALSAlert"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664350839106:android:767e324151cd8c070cf8db",
+        "android_client_info": {
+          "package_name": "com.samehf.alsalert2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "664350839106-c3s6ddbj1js0m8ru2vod6q1nov1jffmc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBci2m3fblze-gT-e_3AklRhIExFds3tks"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "664350839106-c3s6ddbj1js0m8ru2vod6q1nov1jffmc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "664350839106-3dafc02usp8b1sdhdu33kpr84br30f1m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "SamehF.ALSAlert"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

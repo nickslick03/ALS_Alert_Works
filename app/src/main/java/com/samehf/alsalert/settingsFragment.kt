@@ -1,0 +1,147 @@
+package com.samehf.alsalert
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import android.os.Handler
+import android.util.Log
+import android.view.MotionEvent
+import android.view.View
+import android.widget.Button
+import android.widget.CheckBox
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
+
+
+class settingsFragment:Fragment(R.layout.fragment_settings) {
+
+    private var handler: Handler? = null
+    private var longPressRunnable: Runnable? = null
+    private val longPressDuration = 5000L // 5 seconds
+    private val db = FirebaseFirestore.getInstance()
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        val button = view.findViewById<Button>(R.id.resetAllButton)
+        val emailText = view.findViewById<TextView>(R.id.showEmailText)
+        val passText = view.findViewById<TextView>(R.id.showPassText)
+        val passBox = view.findViewById<CheckBox>(R.id.showPassBox)
+
+        val preferences = requireActivity().getSharedPreferences("LoginPrefs", AppCompatActivity.MODE_PRIVATE)
+        val savedEmail = preferences.getString("email", null)
+        val savedPassword = preferences.getString("password", null)
+
+        emailText.text = savedEmail
+        passText.text = "********"
+
+        passBox.setOnClickListener {
+            if(passBox.isChecked) {
+                passText.text = savedPassword
+            } else {
+                passText.text = "********"
+            }
+        }
+
+
+        button.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    startTimer()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    cancelTimer()
+                }
+            }
+            true
+        }
+    }
+
+    private fun startTimer() {
+        handler = Handler()
+        longPressRunnable = Runnable {
+            // Your long press action here
+            // This code will execute after 3 seconds of pressing the button
+            // Replace the code inside this block with your desired action
+            //Log.d("test123","123123")
+            val preferences = requireActivity().getSharedPreferences("LoginPrefs", AppCompatActivity.MODE_PRIVATE)
+            var uid = preferences.getString("uid", null)
+
+            if (uid != null) {
+                db.collection("ALSAlert").document(uid)
+                    .update("resetAll", "1")
+                var ipaddress : String
+                db.collection("ALSAlert").document(uid)
+                    .get(Source.DEFAULT).addOnCompleteListener {
+
+                        ipaddress = it.result.data?.get("ipaddress").toString()
+//                        Log.d("ipaddres", ipaddress)
+                        val url = "http://${ipaddress}:80/checknow"
+                        sendHttpRequest(url,
+                            onSuccess = { response ->
+                                // Handle successful response
+                                Log.d("Response", response)
+                            },
+                            onError = { error ->
+                                // Handle error
+                                error.printStackTrace()
+                            }
+                        )
+                    }
+
+            }
+
+            val editor = preferences.edit()
+            editor.putString("email", null)
+            editor.putString("password", null)
+            editor.putString("uid", null)
+            editor.putString("step", "initial")
+            editor.apply()
+
+
+            val intent = Intent(activity, MainActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            //Toast.makeText(context,"Reset Succesful",Toast.LENGTH_LONG).show()
+        }
+        handler?.postDelayed(longPressRunnable!!, longPressDuration)
+    }
+
+    private fun cancelTimer() {
+        handler?.removeCallbacks(longPressRunnable!!)
+    }
+    fun sendHttpRequest(url: String, onSuccess: (String) -> Unit, onError: (Exception) -> Unit) {
+        GlobalScope.launch(Dispatchers.IO) {
+            try {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+
+                val inputStream = connection.inputStream
+                val reader = BufferedReader(InputStreamReader(inputStream))
+                val response = reader.use(BufferedReader::readText)
+
+                onSuccess(response)
+
+                reader.close()
+                inputStream.close()
+                connection.disconnect()
+            } catch (e: Exception) {
+                onError(e)
+            }
+        }
+    }
+
+}
