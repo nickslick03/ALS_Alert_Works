@@ -1,0 +1,64 @@
+package com.samehf.alsalert;
+
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+//import androidx.core.app.
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore ;
+import com.google.firebase.messaging.FirebaseMessagingService;
+import com.google.firebase.messaging.RemoteMessage;
+import android.annotation.SuppressLint;
+
+
+import com.google.android.datatransport.runtime.Destination;
+
+
+public class alarmRec extends BroadcastReceiver {
+  //  private lateinit var firebaseAuth: FirebaseAuth
+
+   // @Override
+   // public void onReceive(Context context, Intent intent )
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+
+       // Intent i = new Intent(context,DestinationActivity.class);
+        Intent i = new Intent(context,DestinationActivity.class );
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, i, PendingIntent.FLAG_IMMUTABLE);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "Alert")
+                .setSmallIcon(R.drawable.ic_launcher_background)    //maybe change to foreground?
+                .setContentTitle("Alert! ")
+                .setContentText("The patient is in need!")
+                .setPriority(2)
+                .setAutoCancel(false)
+                .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                .setContentIntent(pendingIntent);
+
+        NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(context);
+        if (ActivityCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        notificationManagerCompat.notify(123, builder.build());
+    }
+
+
+
+}
