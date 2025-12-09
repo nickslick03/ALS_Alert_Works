@@ -92,7 +92,7 @@ void setup() {
     Serial.println("\nConnected to WiFi.");
     Serial.println("");
     Serial.println(WiFi.localIP());
-    
+   
 
     /* Assign the api key (required) */
     config.api_key = API_KEY;
@@ -105,7 +105,7 @@ void setup() {
     config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
 
     Firebase.begin(&config, &auth);
-    
+   
     Firebase.reconnectWiFi(true);
 
     //----------------------------------------------
@@ -134,14 +134,14 @@ void setup() {
     content.set("fields/ipaddress/stringValue", WiFi.localIP().toString()); //This keeps track of ip address
 
     //I programmed Cloud Functions to catch "now" and put the current timestamp
-    content.set("fields/lastConnectiontemp/stringValue", "now"); 
-    
-      
+    content.set("fields/lastConnectiontemp/stringValue", "now");
+   
+     
       //esp is the collection id, user uid is the document id in collection info.
     path = "ALSAlert/"+uid+"";
-    
+   
     Serial.print("Create document... ");
-  
+ 
     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "",path.c_str(),content.raw(),"connected,lastConnectiontemp,ipaddress")) //"connected" makes it only change that field. If ommitted, it clears all other fields
         Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
 
@@ -164,14 +164,14 @@ void setup() {
     WiFi.softAP(ssid, password);
     server.begin();
     Serial.println("Access Point started.");
-    
+   
   }
 }
 
 void loop() {
   if(storedSSID.length() <= 0){
     getWifiInfo();
-  }else {
+  } else {
 
     if(alarmTriggered){
       checkTest();
@@ -186,7 +186,7 @@ void loop() {
         while (!client.available()) {            // Wait until the client sends some data
           // delay(1);
         }
-
+       
         String request = client.readStringUntil('\r');
         Serial.println(request);
         client.flush();
@@ -196,18 +196,23 @@ void loop() {
         // Call your function here
         checkTest();
       }
-    //Send a response to the client. Keeps it from refreshing and sending more than once.
-        client.println("HTTP/1.1 200 OK");
-        client.println("Content-Type: text/html");
-        client.println();
-        client.println("<!DOCTYPE HTML>");
-        client.stop();
+     
+      if (request.indexOf("ssid=") != -1 && request.indexOf("password=") != -1) {
+        resetWifiInfo(client, request);
+      }
+
+      //Send a response to the client. Keeps it from refreshing and sending more than once.
+      client.println("HTTP/1.1 200 OK");
+      client.println("Content-Type: text/html");
+      client.println();
+      client.println("<!DOCTYPE HTML>");
+      client.stop();
     }
-    
-	
-	// //If this delay is not here, it will cost $0.16 per day per device.
+   
+ 
+  // //If this delay is not here, it will cost $0.16 per day per device.
   //   //With 2s delay, it will cost 0.03$ per day per device.
-	// delay(1000);
+  // delay(1000);
 
 
   }
@@ -228,20 +233,20 @@ void checkTest() {
     FirebaseJson payload;
     payload.setJsonData(fbdo.payload().c_str());
 
-    // Get the data from FirebaseJson object 
+    // Get the data from FirebaseJson object
     FirebaseJsonData jsonData;
     payload.get(jsonData, "fields/connected/stringValue", true);
     //Serial.println(jsonData.stringValue);
-    
+   
     if(jsonData.stringValue == "3"){
       Serial.println("Connected was read to be 3. Now changing to 4");
 
     setFirestoreValue("lastConnectiontemp","now");
-    
+   
     delay(1500);
 
     setFirestoreValue("connected", "4");
-    
+   
     }
 
     jsonData.clear();
@@ -251,8 +256,8 @@ void checkTest() {
 
     setFirestoreValue("startAlarm","0");
     alarmTriggered = true;
-    
-    } 
+   
+    }
 
     jsonData.clear();
     payload.get(jsonData, "fields/stopAlarm/stringValue", true);
@@ -261,9 +266,9 @@ void checkTest() {
 
     setFirestoreValue("stopAlarm","0");
     alarmTriggered = false;
-    
+   
     }
-    
+   
     jsonData.clear();
     payload.get(jsonData, "fields/resetAll/stringValue", true);
     if(jsonData.stringValue == "1"){
@@ -272,7 +277,7 @@ void checkTest() {
     setFirestoreValue("resetAll","0");
     clearStoredCredentials();
     ESP.restart();
-    
+   
     }    
 
   }
@@ -317,7 +322,70 @@ void getWifiInfo() {
         String passStr = request.substring(passIndex + 10, emailIndex);
         String emailStr = request.substring(emailIndex + 7, epassIndex);
         String epassStr = request.substring(epassIndex + 11, htmlIndex);
-    
+   
+        Serial.println(ssidStr);
+        Serial.println("pass:" + passStr + ":END");
+        Serial.println("email:" + emailStr + ":END");
+        Serial.println("epass:" + epassStr + ":END");
+
+        // Save SSID and password to EEPROM
+        writeEEPROM(ssidAddr, ssidStr);
+        writeEEPROM(passAddr, passStr);
+        writeEEPROM(emailAddr, emailStr);
+        writeEEPROM(epassAddr, epassStr);
+
+        // Restart ESP8266
+        ESP.restart();
+      }
+    }
+
+    // Send a response to the client
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: text/html");
+    client.println();
+    client.println("<!DOCTYPE HTML>");
+    client.println("<html>");
+    client.println("<head><title>ESP8266 Setup</title></head>");
+    client.println("<body>");
+    client.println("<h1>ESP8266 Setup</h1>");
+    client.println("<p>Send WiFi SSID and password to set up.</p>");
+    client.println("</body>");
+    client.println("</html>");
+
+    delay(1);
+    Serial.println("Client disconnected.");
+    client.stop();
+  }
+}
+
+void resetWifiInfo(WiFiClient &client, String request) {
+ 
+  if (client) {                             // If a new client connects
+    Serial.println("New Client.");
+    while (!client.available()) {            // Wait until the client sends some data
+      delay(1);
+    }
+
+    Serial.println(request);
+    client.flush();
+
+    // Check if request contains WiFi credentials
+    if (request.indexOf("ssid=") != -1 && request.indexOf("password=") != -1) {
+      // Parse SSID and password from the request
+      int ssidIndex = request.indexOf("ssid=");
+      int passIndex = request.indexOf("&password=");
+      int emailIndex = request.indexOf("&email=");
+      int epassIndex = request.indexOf("&epassword=");
+      int htmlIndex = request.indexOf(" HTTP/1.1");
+
+    if (ssidIndex != -1 && passIndex != -1) {
+      // Extract SSID and password from the request string
+        String ssidStr = request.substring(ssidIndex + 5, passIndex);
+        ssidStr.replace("%20"," ");
+        String passStr = request.substring(passIndex + 10, emailIndex);
+        String emailStr = request.substring(emailIndex + 7, epassIndex);
+        String epassStr = request.substring(epassIndex + 11, htmlIndex);
+   
         Serial.println(ssidStr);
         Serial.println("pass:" + passStr + ":END");
         Serial.println("email:" + emailStr + ":END");
