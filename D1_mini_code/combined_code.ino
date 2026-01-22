@@ -65,9 +65,10 @@ void IRAM_ATTR Interrupt() {
 
   update(); // Updates the thresholding and fourier variables
   checkTrigger(); // Checks if the trigger requirements are met
-   Serial.println(String(User.min) + " " + String(User.max) + " " + String(maxIndex) + ", 0, 1024, " + String(val) + " " + String(arrLen) + " " + String(fftTrig) + " " + String(trigger));
+  // Serial.println(String(User.min) + " " + String(User.max) + " " + String(maxIndex) + ", 0, 1024, " + String(val) + " " + String(arrLen) + " " + String(fftTrig) + " " + String(trigger));
   // SDSave(); // Save data to the SD card
   //Serial.println(String(timer) + ", " + String(val));
+  Serial.println(String(val));
 }
 
 void setup() {
@@ -322,10 +323,12 @@ UserData Initialize() {
   }
 
   if (maxIdx > 2) {
+    int maxCount = 0;
     for(int i = 1; i < maxIdx; i++){
       userMax += maxVs[i];
+      maxCount++;
     }
-    userMax /= (maxIdx-2);
+    userMax /= maxCount;
     userMax -= (userMax-512)*percentOffset;
   } else {
     userMax = 800;
