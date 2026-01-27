@@ -46,10 +46,10 @@ const int passMaxLen = 64; // Maximum length of password
 const int emailMaxLen = 64; // Maximum length of SSID
 const int epassMaxLen = 64; // Maximum length of password
 
-//const int ssidAddr = 0; // Address to store SSID in EEPROM
-//const int passAddr = 32; // Address to store password in EEPROM
-//const int emailAddr = 64; // Address to store SSID in EEPROM
-//const int epassAddr = 96; // Address to store password in EEPROM
+const int ssidAddr = 0; // Address to store SSID in EEPROM
+const int passAddr = 32; // Address to store password in EEPROM
+const int emailAddr = 64; // Address to store SSID in EEPROM
+const int epassAddr = 96; // Address to store password in EEPROM
 
 int val;
 int t = 0;
@@ -65,14 +65,11 @@ volatile uint32_t timer = 0; // Tracks the time of the code without millis()
 volatile uint16_t buttonCount = 0; // Tracks if the button has been held
 File myFile; // SD file
 
-
-
 // Struct to store the users data
 struct UserData {
   int max;
   int min;
 };
-
 UserData User;
 
 bool threshTrig = false;
@@ -669,7 +666,7 @@ UserData Initialize() {
   int initTime = 15 * 1000;
   int locMax = 0;
   int locMin = 1500;
-  int maxIdx = 0; //what is the purpose of this var? does it count?
+  int maxIdx = 0;
   int minIdx = 0;
   volatile int tempArr[3];
   volatile int tempTime[3];
@@ -732,7 +729,7 @@ UserData Initialize() {
       userMin += minVs[i];
     }
     userMin /= (minIdx-2);
-    userMin += (512-userMin)*percentOffset;//i also don't understand the point of this, except the offset
+    userMin += (512-userMin)*percentOffset;
   } else {
     userMin = 200;
   }
@@ -771,5 +768,4 @@ void SDSave() {
 }
 
 //End EOG Code 
-
 
