@@ -1,16 +1,94 @@
-//http://192.168.4.1/?ssid=Sameh&password=1481976Wa&email=sam@a.com&epassword=123123
-//This combined_code is the code combined from EOG_D1_MINI_FINAL and the FinalFirebase
+//combined code of EOG_D1_MINI_FINAL and FinalFirebase 
 
+//begin EOG initialization 
+
+//millis() will overflow after 50 days. Make sure to reset it after each charge.
+
+#include <SPI.h>
+#include <SD.h>
+#include <arduinoFFT.h>
+#include "ESP8266TimerInterrupt.h"       //https://github.com/khoih-prog/ESP8266TimerInterrupt
+#include "ESP8266_ISR_Timer.hpp"         //https://github.com/khoih-prog/ESP8266TimerInterrupt
+#include <Firebase_ESP_Client.h>
 #include <ESP8266WiFi.h>
 #include <EEPROM.h>
-#include <Firebase_ESP_Client.h>
 #include <addons/TokenHelper.h>
+
+
+#define SAMPLES 128            // Number of samples
+#define TIMER_INTERVAL_MS 20   // Frequency = 1/(TIMER_INTERVAL_MS/1000) = 50 Hz
+
 
 /* 2. Define the API Key */
 #define API_KEY "AIzaSyCyEekgfYi5o1y20-P_4Q2LVJA-QK-YCI0"
 
 /* 3. Define the project ID */
 #define FIREBASE_PROJECT_ID "alsalert"
+
+
+// Fourier Transform Variables
+double vReal[SAMPLES];
+double vImag[SAMPLES];
+double fftMagnitude[SAMPLES];
+int valArr[SAMPLES];
+int maxIndex;
+uint8_t fftCount = 0;
+ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, SAMPLES, 50);
+
+
+// Variables for reset
+const int ssidMaxLen = 32; // Maximum length of SSID
+const int passMaxLen = 64; // Maximum length of password
+const int emailMaxLen = 64; // Maximum length of SSID
+const int epassMaxLen = 64; // Maximum length of password
+
+const int ssidAddr = 0; // Address to store SSID in EEPROM
+const int passAddr = 32; // Address to store password in EEPROM
+const int emailAddr = 64; // Address to store SSID in EEPROM
+const int epassAddr = 96; // Address to store password in EEPROM
+
+int val;
+int t = 0;
+int throwOutTime = 400; // Window of time before a single look is discarded (ms) e.g. holding left
+int maxTime = 15; // Window of time before a move is discarded (s)
+int arrSize = 10; // How many moves are needed
+long arr[10]; // UPDATE THIS BASED ON ARRSIZE
+int arrLen = 0;
+bool moved = false;
+
+ESP8266Timer ITimer; // Init ESP8266 only and only Timer 1
+volatile uint32_t timer = 0; // Tracks the time of the code without millis()
+volatile uint16_t buttonCount = 0; // Tracks if the button has been held
+File myFile; // SD file
+
+// Struct to store the users data
+struct UserData {
+  int max;
+  int min;
+};
+UserData User;
+
+bool threshTrig = false;
+bool fftTrig = false;
+bool trigger = false;
+
+// Interrupt Handler
+void IRAM_ATTR Interrupt() {
+
+  EOG_update(); // Updates the thresholding and fourier variables
+  checkTrigger(); // Checks if the trigger requirements are met
+   Serial.println(String(User.min) + " " + String(User.max) + " " + String(maxIndex) + ", 0, 1024, " + String(val) + " " + String(arrLen) + " " + String(fftTrig) + " " + String(trigger));
+  // SDSave(); // Save data to the SD card
+   //Serial.println(String(timer) + ", " + String(val));
+}
+
+//End EOG initialization
+
+
+//begin Firebase initialization
+
+//http://192.168.4.1/?ssid=Sameh&password=1481976Wa&email=sam@a.com&epassword=123123
+
 
 
 //Define Firebase Data object
@@ -26,10 +104,10 @@ String path;
 const char* ssid = "ALS Alert";
 const char* password = "";
 
-const int ssidMaxLen = 32; // Maximum length of SSID
-const int passMaxLen = 64; // Maximum length of password
-const int emailMaxLen = 64; // Maximum length of SSID
-const int epassMaxLen = 64; // Maximum length of password
+//const int ssidMaxLen = 32; // Maximum length of SSID
+//const int passMaxLen = 64; // Maximum length of password
+//const int emailMaxLen = 64; // Maximum length of SSID
+//const int epassMaxLen = 64; // Maximum length of password
 const int successMaxLen = 32; // Maximum length of success
 
 const int ssidAddr = 0; // Address to store SSID in EEPROM
@@ -49,7 +127,38 @@ bool alarmTriggered = false;
 
 WiFiServer server(80);
 
-void setup() {
+//End Firebase initialization
+
+//Begin EOG Setup
+void EOG_setup() {
+  // Initialize the serial communication:
+  Serial.begin(115200);
+
+  // if (!SD.begin(10)) {
+  //   Serial.println("Card failed, or not present");
+  //   // don't do anything more:
+  // }
+  Serial.println("Starting");
+  // myFile = SD.open("data3.txt", FILE_WRITE);
+  
+  pinMode(D1, OUTPUT); // Button
+  pinMode(D2, OUTPUT); // Speaker
+
+  // Initialize variables for the user
+  User.min = 200; // Default values
+  User.max = 800;
+  User = Initialize(); 
+  
+  if(ITimer.attachInterruptInterval(TIMER_INTERVAL_MS * 1000, Interrupt)) 
+  {
+  }
+}
+
+//End EOG Setup 
+
+//begin Firebase Setup
+
+void setup() {  //may need to change names of these too
   //clearStoredCredentials();
   Serial.begin(115200);
   pinMode(buttonPin,INPUT);
@@ -93,7 +202,7 @@ void setup() {
     Serial.println("\nConnected to WiFi.");
     Serial.println("");
     Serial.println(WiFi.localIP());
-   
+    
 
     /* Assign the api key (required) */
     config.api_key = API_KEY;
@@ -106,7 +215,7 @@ void setup() {
     config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
 
     Firebase.begin(&config, &auth);
-   
+    
     Firebase.reconnectWiFi(true);
 
     //----------------------------------------------
@@ -135,14 +244,14 @@ void setup() {
     content.set("fields/ipaddress/stringValue", WiFi.localIP().toString()); //This keeps track of ip address
 
     //I programmed Cloud Functions to catch "now" and put the current timestamp
-    content.set("fields/lastConnectiontemp/stringValue", "now");
-   
-     
+    content.set("fields/lastConnectiontemp/stringValue", "now"); 
+    
+      
       //esp is the collection id, user uid is the document id in collection info.
     path = "ALSAlert/"+uid+"";
-   
+    
     Serial.print("Create document... ");
- 
+  
     if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "",path.c_str(),content.raw(),"connected,lastConnectiontemp,ipaddress")) //"connected" makes it only change that field. If ommitted, it clears all other fields
         Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
 
@@ -169,44 +278,14 @@ void setup() {
   }
 }
 
-// //YOYOYO, this is test code to try out adding startCal to the Firebase
-
-// //initialize functions
-
-// void addFieldToFirestore(const String &collectionRef, const String &fieldName, const String &value){
-//   //Collection, Document based on the user, field
-// //   Firebase.Firestore.getDocument("uid").Set({{"startCal", FieldValue::String("0")}}, SetOptions::Merge());
-// //     .OnCompletion([](const Future<void>& future) {
-// //       if (future.error() == Error::kErrorOk) {
-// //         std::cout << "DocumentSnapshot successfully written!" << std::endl;
-// //       } else {
-// //         std::cout << "Error writing document: " << future.error_message()
-// //                   << std::endl;
-// //       }
-// //     });
-// // }
-// // Define the collection and document you want to update
-//   String documentPath = "ALSAlert/uid";  // Example: users is your collection and uid is the document ID
-  
-//   // Prepare the data to update the document
-//   FirebaseJson json;
-//   json.set("startCal", "0");  // Set the field "startCal" to "0"
-
-//   // Update the document in Firestore
-//   if (Firebase.Firestore.getDocument(fbdo, documentPath, &json)) {
-//     Serial.println("Document successfully updated!");
-//   } else {
-//     Serial.println("Error updating document: " + Firebase.error());
-//   }
-// }
-
-// //end of this line of test
+//End Firebase Setup 
 
 
+//Begin Firebase loop
 void loop() {
-  if(storedSSID.length() <= 0){
+    if(storedSSID.length() <= 0){
     getWifiInfo();
-  } else {
+  }else {
 
     if(alarmTriggered){
       checkTest();
@@ -221,6 +300,7 @@ void loop() {
         while (!client.available()) {            // Wait until the client sends some data
           // delay(1);
         }
+
         String request = client.readStringUntil('\r');
         Serial.println(request);
         client.flush();
@@ -230,28 +310,24 @@ void loop() {
         // Call your function here
         checkTest();
       }
-     
-      if (request.indexOf("ssid=") != -1 && request.indexOf("password=") != -1) {
-        resetWifiInfo(client, request);
-      }
-
-      //Send a response to the client. Keeps it from refreshing and sending more than once.
-      client.println("HTTP/1.1 200 OK");
-      client.println("Content-Type: text/html");
-      client.println();
-      client.println("<!DOCTYPE HTML>");
-      client.stop();
+    //Send a response to the client. Keeps it from refreshing and sending more than once.
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/html");
+        client.println();
+        client.println("<!DOCTYPE HTML>");
+        client.stop();
     }
-   
- 
-  // //If this delay is not here, it will cost $0.16 per day per device.
+    
+	
+	// //If this delay is not here, it will cost $0.16 per day per device.
   //   //With 2s delay, it will cost 0.03$ per day per device.
-  // delay(1000);
-
+	// delay(1000);
 
   }
-
 }
+//End Firebase Loop 
+
+//Begin Firebase Code 
 
 void checkTest() {
   Serial.println("Checked now!");
@@ -267,20 +343,20 @@ void checkTest() {
     FirebaseJson payload;
     payload.setJsonData(fbdo.payload().c_str());
 
-    // Get the data from FirebaseJson object
+    // Get the data from FirebaseJson object 
     FirebaseJsonData jsonData;
     payload.get(jsonData, "fields/connected/stringValue", true);
     //Serial.println(jsonData.stringValue);
-   
+    
     if(jsonData.stringValue == "3"){
       Serial.println("Connected was read to be 3. Now changing to 4");
 
     setFirestoreValue("lastConnectiontemp","now");
-   
+    
     delay(1500);
 
     setFirestoreValue("connected", "4");
-   
+    
     }
 
     jsonData.clear();
@@ -290,8 +366,8 @@ void checkTest() {
 
     setFirestoreValue("startAlarm","0");
     alarmTriggered = true;
-   
-    }
+    
+    } 
 
     jsonData.clear();
     payload.get(jsonData, "fields/stopAlarm/stringValue", true);
@@ -300,21 +376,9 @@ void checkTest() {
 
     setFirestoreValue("stopAlarm","0");
     alarmTriggered = false;
-
+    
     }
-
-    //Code to set the startCal to 0 to verify it reads through
-    jsonData.clear();
-        payload.get(jsonData, "fields/startCal/stringValue", true);
-        if(jsonData.stringValue == "1"){
-          Serial.println("Calibration Stopped! Setting to 0");
-
-        setFirestoreValue("startCal","0");
-        alarmTriggered = false;
-
-    }
-
-
+    
     jsonData.clear();
     payload.get(jsonData, "fields/resetAll/stringValue", true);
     if(jsonData.stringValue == "1"){
@@ -323,7 +387,7 @@ void checkTest() {
     setFirestoreValue("resetAll","0");
     clearStoredCredentials();
     ESP.restart();
-   
+    
     }    
 
   }
@@ -368,71 +432,7 @@ void getWifiInfo() {
         String passStr = request.substring(passIndex + 10, emailIndex);
         String emailStr = request.substring(emailIndex + 7, epassIndex);
         String epassStr = request.substring(epassIndex + 11, htmlIndex);
-   
-        Serial.println(ssidStr);
-        Serial.println("pass:" + passStr + ":END");
-        Serial.println("email:" + emailStr + ":END");
-        Serial.println("epass:" + epassStr + ":END");
-
-        // Save SSID and password to EEPROM
-        writeEEPROM(ssidAddr, ssidStr);
-        writeEEPROM(passAddr, passStr);
-        writeEEPROM(emailAddr, emailStr);
-        writeEEPROM(epassAddr, epassStr);
-
-        // Restart ESP8266
-        ESP.restart();
-      }
-    }
-
-    // Send a response to the client
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: text/html");
-    client.println();
-    client.println("<!DOCTYPE HTML>");
-    client.println("<html>");
-    client.println("<head><title>ESP8266 Setup</title></head>");
-    client.println("<body>");
-    client.println("<h1>ESP8266 Setup</h1>");
-    client.println("<p>Send WiFi SSID and password to set up.</p>");
-    client.println("</body>");
-    client.println("</html>");
-
-    delay(1);
-    Serial.println("Client disconnected.");
-    client.stop();
-  }
-}
-
-// resetWifInfo rewrites the wifi data in the EEPROM storage. This is called when the user wants to rewrite the wifi data of the device.
-void resetWifiInfo(WiFiClient &client, String request) {
- 
-  if (client) {                             // If a new client connects
-    Serial.println("New Client.");
-    while (!client.available()) {            // Wait until the client sends some data
-      delay(1);
-    }
-
-    Serial.println(request);
-    client.flush();
-
-    // Check if request contains WiFi credentials
-    if (request.indexOf("ssid=") != -1 && request.indexOf("password=") != -1) {
-      // Parse SSID and password from the request
-      int ssidIndex = request.indexOf("ssid=");
-      int passIndex = request.indexOf("&password=");
-      int emailIndex = request.indexOf("&email=");
-      int epassIndex = request.indexOf("&epassword=");
-      int htmlIndex = request.indexOf(" HTTP/1.1");
-
-    if (ssidIndex != -1 && passIndex != -1) {
-      // Extract SSID and password from the request string
-        String ssidStr = request.substring(ssidIndex + 5, passIndex);
-        ssidStr.replace("%20"," ");
-        String passStr = request.substring(passIndex + 10, emailIndex);
-        String emailStr = request.substring(emailIndex + 7, epassIndex);
-        String epassStr = request.substring(epassIndex + 11, htmlIndex);
-   
+    
         Serial.println(ssidStr);
         Serial.println("pass:" + passStr + ":END");
         Serial.println("email:" + emailStr + ":END");
@@ -505,3 +505,263 @@ void clearStoredCredentials() {
   EEPROM.end();
   Serial.println("Stored WiFi credentials cleared.");
 }
+//End Firebase code
+
+//Begin EOG Code
+
+void EOG_update() { //EOG_update 
+  
+  val = analogRead(A0); // Get input
+  timer += TIMER_INTERVAL_MS; // Update timer based on our interrupt time
+
+  ////////////////////
+  // USE FFT METHOD //
+  ////////////////////
+
+  maxIndex = CalcFFT();
+
+  // Update the counter if they are moving their eyes at a consistent rate 
+  if(maxIndex >= 2 && maxIndex <= 8 && fftCount < 200) {
+    fftCount++;
+  } else if(fftCount > 0 && maxIndex < 2) {
+    fftCount--;
+  }
+  
+  /////////////////////////////
+  // USE THRESHOLDING METHOD //
+  /////////////////////////////
+
+  removeArray(); // Removes any movements that occured too long ago
+
+  // If they look right, store the time and confirm the movement
+  if(val>=User.max && !moved){
+    moved = true;
+    t = timer;
+  }
+
+  // If they look back left quickly enough after moving right, add to the array
+  if (val<=User.min && moved) {
+    moved = false;
+    if(arrLen<arrSize) {
+      // Add the time to the array, and increase arrLen for trigger checking
+      arr[arrLen]=timer;
+      arrLen++;
+    } else {
+      // If the array is full, shift the last one off
+      for(int j = 0; j<arrLen; j++){
+        arr[j] = arr[j+1];
+      }
+      arr[arrLen] = timer;
+    }
+  }
+
+  // Throw out the move if the user never crossed the threshold again
+  if(moved && t+throwOutTime < timer) {
+    moved = false;
+  }
+
+}
+
+
+void removeArray() {
+  if(timer>(arr[0]+(15*1000)) && arrLen > 0){
+    for(int j = 0; j<arrLen; j++){
+      arr[j] = arr[j+1];
+    }
+    arrLen-=1;
+  }
+}
+
+void checkTrigger() {
+
+  /////////////////
+  // FFT TRIGGER //
+  /////////////////
+
+  if(fftCount >= 150) {
+    fftTrig = true;
+  } else {
+    fftTrig = false;
+  }
+
+  //////////////////////////
+  // THRESHOLDING TRIGGER //
+  //////////////////////////
+
+  if(arrLen >= arrSize){
+    threshTrig = true;
+  } else {
+    threshTrig = false;
+  }
+
+  if(threshTrig && fftTrig){
+    trigger = true;
+  } else {
+    trigger = false;
+  }
+
+  ///////////////////////////////////////////////
+  ///// READ BUTTON INPUT, TURN TRIGGER OFF /////
+  ///// AND RESET VARIABLES FOR TRIGGERING //////
+  ///////////////////////////////////////////////
+
+  // If the trigger variable is true, sound the alarm
+  if(trigger) {
+    digitalWrite(D2, HIGH);
+  }
+
+  // If the button is pressed turn off the alarm and reset the variables
+  if(digitalRead(D1) == 1) {
+    digitalWrite(D2, LOW);
+    trigger = false;
+    arrLen = 0;
+    for(int j = 0; j<arrSize; j++){
+      arr[j] = 0;
+    }
+    fftCount = 0;
+    buttonCount += TIMER_INTERVAL_MS;
+    if(buttonCount >= 2500) {
+      ESP.restart();
+    }
+  } else {
+    buttonCount = 0;
+  }
+}
+
+int CalcFFT() {
+
+  // Populate the real part of the input data
+  for (int i = SAMPLES-2; i >= 0; i--) {
+    valArr[i+1] = valArr[i];
+    vReal[i+1] = valArr[i+1];
+    vImag[i+1] = 0;
+  }
+
+  valArr[0] = val;
+  vReal[0] = val;
+  vImag[0] = 0;
+
+  FFT.dcRemoval();
+  FFT.windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+  FFT.compute(vReal, vImag, SAMPLES, FFT_FORWARD);
+  FFT.complexToMagnitude(vReal, vImag, SAMPLES);
+  double maxMagnitude = 0;
+  int maxIndex = 0;
+
+  for (int i = 0; i < SAMPLES / 2; i++) { // Only consider first half (Nyquist limit)
+    if (vReal[i] > maxMagnitude) {
+      maxMagnitude = vReal[i];
+      maxIndex = i;
+    }
+  }
+
+  return maxIndex;
+}
+
+UserData Initialize() {
+  int initTime = 15 * 1000;
+  int locMax = 0;
+  int locMin = 1500;
+  int maxIdx = 0;
+  int minIdx = 0;
+  volatile int tempArr[3];
+  volatile int tempTime[3];
+  int minVs[50];
+  int maxVs[50];
+  memset(minVs,0,sizeof(minVs));
+  memset(maxVs,0,sizeof(maxVs));
+  bool movedI = false;
+
+  while(millis() < initTime) {
+    // Read the voltage
+    val = analogRead(A0);
+    Serial.println(val);
+
+    // Update the arrays with values
+    tempArr[0] = tempArr[1];
+    tempArr[1] = tempArr[2];
+    tempArr[2] = val;
+    tempTime[0] = tempTime[1];
+    tempTime[1] = tempTime[2];
+    tempTime[2] = millis();
+
+    // Check if there is a peak above the threshold
+    if(tempArr[1] > tempArr[0] && tempArr[1] > tempArr[2] && tempArr[1] > 600){
+      if(movedI){
+        movedI = false;
+        minVs[minIdx] = locMin;
+        minIdx++;
+        locMin = 1500;
+      }
+
+      if(tempArr[1] > locMax) {
+        locMax = tempArr[1];
+      }
+    }
+
+    // Check if there is a valley below the threshold
+    if(tempArr[1] < tempArr[0] && tempArr[1] < tempArr[2] && tempArr[1] < 400){
+      if(!movedI) {
+        movedI = true;
+        maxVs[maxIdx] = locMax;//set first value in array to locmax? 
+        maxIdx++; //increm maxidx 
+        locMax = 0;
+      }
+      
+      if(tempArr[1] < locMin) {
+        locMin = tempArr[1];
+      }
+    }
+
+  }
+
+  // Print the data and calculate the users average min and max
+  uint16_t userMin = 200;
+  uint16_t userMax = 800;
+  float percentOffset = 0.3;
+
+  if (minIdx > 2) {
+    for(int i = 1; i < minIdx; i++){
+      userMin += minVs[i];
+    }
+    userMin /= (minIdx-2);
+    userMin += (512-userMin)*percentOffset;
+  } else {
+    userMin = 200;
+  }
+
+  if (maxIdx > 2) {
+    for(int i = 1; i < maxIdx; i++){  //reason for starting at 1 and not 0? 
+      userMax += maxVs[i];   //add value at i to max  
+    }
+    userMax /= (maxIdx-2); //after adding,  divide it by the value of maxidx - 2) (this should give us the avg)
+    userMax -= (userMax-512)*percentOffset; //after dividing, subtract the new value of (userMax - 512)*.3 and set that to usermax
+    //why are we subtracting? where does 512 come from? 
+  } else {
+    userMax = 800;
+  }
+
+//^^ this is the alg for calculating the max 
+
+  // Store the data in a structure to return
+  UserData thisUser;
+  thisUser.max = userMax;
+  thisUser.min = userMin;
+  return thisUser;
+}
+
+void SDSave() {  
+  // Serial.println(myFile);
+  if (myFile) {
+    myFile.print(timer);
+    myFile.print(",");
+    myFile.println(analogRead(A0));
+    // close the file:
+  } else {
+    // if the file didn't open, print an error:
+    myFile.close();
+  }
+}
+
+//End EOG Code 
+
