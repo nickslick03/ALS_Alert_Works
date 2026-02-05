@@ -14,3 +14,7 @@ x*.iml
 .externalNativeBuild
 .cxx
 local.properties
+
+*.keystore
+release.keystore
+release.keystore.b64
