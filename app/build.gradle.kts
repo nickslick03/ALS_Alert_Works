@@ -18,6 +18,29 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "release.keystore")
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
+    }
+
+    applicationVariants.all {
+        outputs.all {
+            val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            outputImpl.outputFileName = "ALS-Alert-${name}.apk"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
