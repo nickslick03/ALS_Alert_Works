@@ -23,6 +23,7 @@
     const int SDA_ESP32 = 3; 
     const int SCL_ESP32 = 4; 
     const int Reset_Button = 26;
+    const int CompPin = 10; //Comparator Pin for electrode contact
 
     const int EOG_Pin = 2; 
 
@@ -30,9 +31,10 @@
     //Parameters
       uint16_t Upper_Thresh = 2700;
       uint16_t Lower_Thresh = 500;
-      const uint8_t NOEM = 5;
+      const uint8_t NOEM = 8;
       uint16_t MET = 7000; // Move Expiration time in mS
       uint16_t SLET = 1500; // Single Look Expiration Time in mS
+      float PO = 0.8;
 
     //Things You Might want to Change
       uint16_t Cal_Thresh = 5000; //How Long Calibration Lasts
@@ -60,6 +62,14 @@
     
     //Calibration
       unsigned long Time_Cal = 0; //Time Calibration started
+      unsigned long Time_Cal_Alt = 0; //Time Calibration started
+      unsigned long Time_Cal_Alt_Mini = 0; //Time Calibration started
+      uint16_t Cal_Thresh_Alt = 3000;
+      uint8_t Cal_Count = 0;
+    
+
+      bool Done = 0;
+
       uint8_t Cal = 0;
 
       //Slope values are used for determinging maxes and mins
@@ -76,6 +86,7 @@
     //Misc
       uint8_t Printed = 0;
       uint8_t Trigger = 0; //0 = no trigger, 1 = trigger, 2 = electrode contact error
+      bool ElectrodeLoose = 0;
       
 
   //LCD Variables
@@ -142,6 +153,7 @@
       
       pinMode(Scroll, INPUT);   //scroll button pin (pulled up externally with 10kohms)
       pinMode(Select, INPUT);   //select button pin(pulled down externally with 10kohms)
+      pinMode(CompPin,INPUT);   //Looks at comparitor signal
       pinMode (Reset_Button, INPUT_PULLDOWN); //reset button (BIG RED BUTTON) switch to be externally pulled up!!! 
 
     //set up I2C pins
@@ -294,23 +306,42 @@ void loop(){
       ///////////Calibration///////////
       /////////////////////////////////
     case Calibration_Menu:
-      //temporary thing so don't get stuck in calibration!!
-      if(selButton.rose()){
-        MenuState = Main_Menu;
-        SelState = opt1;
-        //Code for Menu display
-        lcd.cls();
-        lcd.display(LINES_4);  // Set to 4-line for main menu
-        lcd.locate(1,1);
-        lcd.print("    MAIN MENU");
-        lcd.locate(2,1);
-        lcd.print("Calibrate    ***");
-        lcd.locate(3,1);
-        lcd.print("Battery Menu    ");
-        lcd.locate(4,1);
-        lcd.print("Run Device    ");
 
-      } else{
+      Time_Cal_Alt = millis();
+      Cal_Count = 0;
+      Done = 0;
+
+        while (Done == 0){
+          Cal_Count = Cal_Count+1;
+
+          if(Cal_Count == 1){
+            Time_Cal_Alt_Mini = millis();
+            //Display: "Calibrating:3"
+            Serial.println("3");
+            while (millis()-Time_Cal_Alt_Mini <= 1000){}
+
+          }else if (Cal_Count == 2){
+            Time_Cal_Alt_Mini = millis();
+            //Display: "Calibrating: 2" 
+            Serial.println("2");
+            while (millis()-Time_Cal_Alt_Mini <= 1000){}
+
+          }else if (Cal_Count == 3){
+            Time_Cal_Alt_Mini = millis();
+            //Display: "Calibrating: 1" 
+            Serial.println("1");
+            while (millis()-Time_Cal_Alt_Mini <= 1000){}
+
+          }else if (Cal_Count == 4){
+            Time_Cal_Alt_Mini = millis();
+            //Display: "Calibrating: GO" 
+            Serial.println("GO!");
+            while (millis()-Time_Cal_Alt_Mini <= 1000){}
+
+            Done = 1;
+          }
+        }
+
         /////////////////////////////////
         lcd.display(LINES_4);
         lcd.locate(1,1);
@@ -322,15 +353,17 @@ void loop(){
         lcd.locate(4,1);
         lcd.print("                ");
         /////////////////////////////////
+        
         Count_Max = 1;
         Count_Min = 1;
         Serial.print(Lower_Thresh); Serial.print("\t"); Serial.println(Upper_Thresh);
 
-        Time_Cal = millis();
+        Time_Cal_Alt = millis();
         Printed = 0;
         Cal = 1;
         Up_Look_Allow = 1;
         Down_Look_Allow = 1;
+        Time_Cal = millis();
         while (Cal == 1){
 
             if (Printed == 0){
@@ -381,15 +414,14 @@ void loop(){
           Upper_Thresh = Upper_Thresh/Count_Max;
           Lower_Thresh = Lower_Thresh/Count_Min;
 
-          // Midpoint = Upper_Thresh - Lower_Thresh;
+          Midpoint = Upper_Thresh - Lower_Thresh;
 
-          // Upper_Thresh = Midpoint + (Upper_Thresh - Midpoint)*0.5;
-          // Lower_Thresh = Midpoint - (Midpoint - Lower_Thresh)*0.5;
+          Upper_Thresh = Midpoint + (Upper_Thresh - Midpoint)*PO;
+          Lower_Thresh = Midpoint - (Midpoint - Lower_Thresh)*PO;
 
           Serial.println("Done");
           Serial.print(Lower_Thresh); Serial.print("\t"); Serial.println(Upper_Thresh);      
 
-      }//End of else
         MenuState = Main_Menu;
         //Code for Menu display
         lcd.cls();
@@ -487,8 +519,8 @@ void loop(){
           Wp_prev = 1;
           Bp_prev = 1;
           break;
-        
-        } else {
+      
+        }else {
           ////// When this is uncommented you can just print the raw EOG signal to make sure it makes sense //////////
             //Serial.println("Made it to trigger detection code");
             // while (1){
@@ -633,6 +665,11 @@ void loop(){
                 lcd.print(" Device Running");  //display "Device Running"
               }
 
+        ElectrodeLoose = digitalRead(CompPin);
+        if (ElectrodeLoose == 1){
+          Trigger = 2;
+        }
+
         }//End of else for no button pressed
       }//End of Detection while loop Loop
 
@@ -679,7 +716,7 @@ void loop(){
 
       } else if (Trigger == 2){
         while (resetButton.read() == LOW){
-
+          Serial.println("Loose Electrode");
           //CODE for beeping alarm for electrode connection
           lcd.display(LINES_4);
           lcd.locate(1,1);
@@ -709,10 +746,6 @@ void loop(){
       }
     Trigger = 0;
     break; //break Alert_State
-
-
-
-  
   }//end of MenuState FSM
 }//end of void loop
 
