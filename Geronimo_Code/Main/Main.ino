@@ -316,24 +316,28 @@ void loop(){
 
           if(Cal_Count == 1){
             Time_Cal_Alt_Mini = millis();
+            //Jasmine
             //Display: "Calibrating:3"
             Serial.println("3");
             while (millis()-Time_Cal_Alt_Mini <= 1000){}
 
           }else if (Cal_Count == 2){
             Time_Cal_Alt_Mini = millis();
+            //Jasmine
             //Display: "Calibrating: 2" 
             Serial.println("2");
             while (millis()-Time_Cal_Alt_Mini <= 1000){}
 
           }else if (Cal_Count == 3){
             Time_Cal_Alt_Mini = millis();
+            //Jasmine
             //Display: "Calibrating: 1" 
             Serial.println("1");
             while (millis()-Time_Cal_Alt_Mini <= 1000){}
 
           }else if (Cal_Count == 4){
             Time_Cal_Alt_Mini = millis();
+            //Jasmine
             //Display: "Calibrating: GO" 
             Serial.println("GO!");
             while (millis()-Time_Cal_Alt_Mini <= 1000){}
@@ -367,6 +371,7 @@ void loop(){
         while (Cal == 1){
 
             if (Printed == 0){
+              //Jasmine : I would replace this bottom part if possible
               Serial.println("Start Active Calibration: Look Left and right");
               Printed = 1;
             }
