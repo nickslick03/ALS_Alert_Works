@@ -511,8 +511,11 @@ void loop(){
     case Run_Device:
       //Serial.println("Made it to run device");
       while (Trigger == 0) {
+          scrollButton.update();  //constantly update the states of the buttons
+          selButton.update();
+          resetButton.update(); 
         //Serial.println("Made it into while loop");
-        if (selButton.rose()) {  //press select to return to main menu
+        if  (selButton.rose()) {  //press select to return to main menu
           //Serial.println("Button Pressed Detected Should be leaving this detection mode");
           MenuState = Main_Menu;
           SelState = opt1;
@@ -531,7 +534,8 @@ void loop(){
           B_power = 1;
           Wp_prev = 1;
           Bp_prev = 1;
-          break;
+          //Serial.println("Should Break");
+          break; 
       
         }else {
           ////// When this is uncommented you can just print the raw EOG signal to make sure it makes sense //////////
@@ -600,6 +604,7 @@ void loop(){
           //Checking for Alarm
           if (Move[NOEM-1] == 1){//If the array is all the way filled up
             Trigger = 1;
+            MenuState = Alert_State;
             Serial.println("Trigger Detected");
             Look = 0;
             Up_Look_Allow = 1;
@@ -681,13 +686,12 @@ void loop(){
         ElectrodeLoose = digitalRead(CompPin);
         if (ElectrodeLoose == 1){
           Trigger = 2;
+          MenuState = Alert_State;
         }
-
         }//End of else for no button pressed
       }//End of Detection while loop Loop
 
-      MenuState = Alert_State;
-      lcd.cls();
+      
       break; //break for Run Device State
 
     /////////////////////////////////
