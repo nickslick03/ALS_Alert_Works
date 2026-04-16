@@ -15,17 +15,19 @@
 /////////////////////////Variables/////////////////////////
 
   //Pin Declarations: HERE: Fill this in with the actual pin needed
-    const int Reset_LCD = 5;
-    const int Battery = 9;
-    const int Wall = 8;
+    const int Reset_LCD = 0;
+    const int Scroll = 1;
+    const int SDA_ESP32 = 2;
+    const int SCL_ESP32 = 3; 
+    const int Battery = 4;
+    const int Wall = 5;
     const int Select = 6;
-    const int Scroll = 7; 
-    const int SDA_ESP32 = 3; 
-    const int SCL_ESP32 = 4; 
-    const int Reset_Button = 26;
-    const int CompPin = 10; //Comparator Pin for electrode contact
+    const int Reset_Button = 9; 
 
-    const int EOG_Pin = 2; 
+    const int CompPin = 15; //Comparator Pin for electrode contact
+    const int CalLED = 23;
+    const int EOG_Pin = 24; 
+    const int CompPin2 = 27
 
   //Trigger Detection Variables
     //Parameters
