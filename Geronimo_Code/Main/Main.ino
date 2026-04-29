@@ -10,25 +10,27 @@
   #include <Wire.h>               //open I^2C library up
   #include <SSD1803A_I2C.h>       //Library for DOGS164-A's controller: SSD1803A
   #include <Bounce2.h>            //open debouncing library for buttons
+  #include <Preferences.h>
 
 
 /////////////////////////Variables/////////////////////////
 
-  //Pin Declarations: HERE: Fill this in with the actual pin needed
-    const int Reset_LCD = 0;
-    const int Scroll = 1;
-    const int SDA_ESP32 = 2;
+     //Pin Declarations: HERE: Fill this in with the actual pin needed
+    const int SDA_ESP32 = 2; 
     const int SCL_ESP32 = 3; 
+    const int Reset_LCD = 0;
+    const int Scroll = 1; 
+    const int EOG_Pin = 6;
+    const int Select = 8;
+    const int Alarm = 10;
+    const int Reset_Button = 26;
+    const int Cal_LED = 23;
+    const int CompPin = 27; //Comparator Pin for electrode contact
     const int Battery = 4;
     const int Wall = 5;
-    const int Select = 6;
-    const int Reset_Button = 9; 
+    const int CompPin2 = 14; //Comparator Pin for electrode contact
 
-    const int CompPin = 15; //Comparator Pin for electrode contact
-    const int CalLED = 23;
-    const int EOG_Pin = 24; 
-    const int CompPin2 = 27
-
+   
   //Trigger Detection Variables
     //Parameters
       uint16_t Upper_Thresh = 2700;
@@ -68,6 +70,10 @@
       unsigned long Time_Cal_Alt_Mini = 0; //Time Calibration started
       uint16_t Cal_Thresh_Alt = 3000;
       uint8_t Cal_Count = 0;
+      unsigned long BeepTime = 0;
+      uint16_t BeepThresh = 500;
+      uint16_t BeepThresh2 = 1000;
+      bool Toggle = 0;
     
 
       bool Done = 0;
@@ -87,8 +93,10 @@
    
     //Misc
       uint8_t Printed = 0;
-      uint8_t Trigger = 0; //0 = no trigger, 1 = trigger, 2 = electrode contact error
+      uint8_t Trigger = 0; //0 = no trigger, 1 = trigger, 2 = electrode 1 loose, 3 = electrode 2 loose
       bool ElectrodeLoose = 0;
+      bool ElectrodeLoose2 = 0;
+      
       
 
   //LCD Variables
@@ -121,7 +129,6 @@
       const uint8_t LCD_Address = 0x3C;
       SSD1803A_I2C lcd (LCD_Address);
 
-
 /////////////////////////Create FSMs/////////////////////////
 
   //Menu states//
@@ -152,11 +159,15 @@
       pinMode(EOG_Pin,INPUT);
       pinMode(Wall, INPUT);     //temporary pin representing wall power
       pinMode(Battery, INPUT);  //temporary pin representing battery power
+      pinMode(Cal_LED,OUTPUT);
+      pinMode(Alarm,OUTPUT);
       
       pinMode(Scroll, INPUT);   //scroll button pin (pulled up externally with 10kohms)
       pinMode(Select, INPUT);   //select button pin(pulled down externally with 10kohms)
-      pinMode(CompPin,INPUT);   //Looks at comparitor signal
       pinMode (Reset_Button, INPUT_PULLDOWN); //reset button (BIG RED BUTTON) switch to be externally pulled up!!! 
+
+      pinMode(CompPin,INPUT);   //Looks at comparitor signal  
+      pinMode(CompPin2,INPUT);   //Looks at comparitor signal  
 
     //set up I2C pins
       Wire.begin(SDA_ESP32,SCL_ESP32);
@@ -237,6 +248,7 @@ void loop(){
 
       //Options selection
       switch (SelState) {
+        Serial.println("Main Menu"); //HERE
 
         /////Calibration/////
         case opt1:  
@@ -457,6 +469,7 @@ void loop(){
       ///////////////////////////////
     case Battery_Menu: 
       //Checking if battery power low
+      //Serial.println("Battery Menu"); //HERE
       if  (selButton.rose()) {
 
         MenuState = Main_Menu;
@@ -647,6 +660,7 @@ void loop(){
               lcd.print("Wall power");
               lcd.locate(2,3);
               lcd.print("disconnected");
+              Serial.println("Wall Power Disconnected");
 
               } else if (W_power == 0 && Wp_prev == 0) {  //if wall power has been out
 
@@ -666,6 +680,7 @@ void loop(){
                       Blink = 0;
                       lcd.locate(2,1);
                     lcd.print("  Battery  Low  ");
+                    Serial.println("Battery Low");
                     }
                     B_Alt_delay = millis();  //restart timer
                   }
@@ -684,10 +699,17 @@ void loop(){
                 lcd.locate(2,1);
                 lcd.print(" Device Running");  //display "Device Running"
               }
-
-        ElectrodeLoose = digitalRead(CompPin);
+        
+  
+          ElectrodeLoose = digitalRead(CompPin);
+          ElectrodeLoose2 = digitalRead(CompPin2);
+          
         if (ElectrodeLoose == 1){
           Trigger = 2;
+          MenuState = Alert_State;
+        }
+        if (ElectrodeLoose2 == 1){
+          Trigger = 3;
           MenuState = Alert_State;
         }
         }//End of else for no button pressed
@@ -714,7 +736,14 @@ void loop(){
           lcd.print("to reset device");
 
           resetButton.update(); //update reset button's state
+
+          if (millis() - BeepTime >= BeepThresh){
+            BeepTime = millis();
+            Toggle = !Toggle;
+            digitalWrite(Alarm,Toggle);
+          }
         }
+          digitalWrite(Alarm,LOW);
 
          
         //Code for Menu display
@@ -733,20 +762,67 @@ void loop(){
         // Send to main menu to reset device
         MenuState = Main_Menu;
 
-      } else if (Trigger == 2){
+      } else if (Trigger == 2){ //Electrode 1 disconnnected
         while (resetButton.read() == LOW){
-          Serial.println("Loose Electrode");
+          //Serial.println("Left Loose Electrode");
           //CODE for beeping alarm for electrode connection
           lcd.display(LINES_4);
           lcd.locate(1,1);
-          lcd.print("Electrodes Loose");
+          lcd.print("Left Electrode");
           lcd.locate(2,1);
-          lcd.print("Hit Red button");
+          lcd.print("Loose           ");
           lcd.locate(3,1);
+          lcd.print("Hit Red button");
+          lcd.locate(4,1);
           lcd.print("to reset device");
 
           resetButton.update(); //update reset button's state
+
+          if (millis() - BeepTime >= BeepThresh2){
+            BeepTime = millis();
+            Toggle = !Toggle;
+            digitalWrite(Alarm,Toggle);
+          }
         }
+        digitalWrite(Alarm,LOW);
+        
+        //Code for Menu display
+        lcd.cls();
+        lcd.display(LINES_4);  // Set to 4-line for main menu
+        lcd.locate(1,1);
+        lcd.print("    MAIN MENU");
+        lcd.locate(2,1);
+        lcd.print("Calibrate    ***");
+        lcd.locate(3,1);
+        lcd.print("Battery Menu    ");
+        lcd.locate(4,1);
+        lcd.print("Run Device    "); 
+        //Put line here to turn off alarm
+        //Send to main menu to reset device
+        MenuState = Main_Menu;
+
+      }else if (Trigger == 3){//Electrode 2 disconnected
+        while (resetButton.read() == LOW){
+          //Serial.println("Right Loose Electrode");
+          //CODE for beeping alarm for electrode connection
+          lcd.display(LINES_4);
+          lcd.locate(1,1);
+          lcd.print("Right Electrode ");
+          lcd.locate(2,1);
+          lcd.print("Loose            ");
+          lcd.locate(3,1);
+          lcd.print("Hit Red button");
+          lcd.locate(4,1);
+          lcd.print("to reset device");
+
+          resetButton.update(); //update reset button's state
+          if (millis() - BeepTime >= BeepThresh2){
+            BeepTime = millis();
+            Toggle = !Toggle;
+            digitalWrite(Alarm,Toggle);
+          }
+        }
+        digitalWrite(Alarm,LOW);
         
         //Code for Menu display
         lcd.cls();
