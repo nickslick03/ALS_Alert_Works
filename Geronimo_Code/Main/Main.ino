@@ -35,10 +35,10 @@
     //Parameters
       uint16_t Upper_Thresh = 2700;
       uint16_t Lower_Thresh = 500;
-      const uint8_t NOEM = 8;
-      uint16_t MET = 13000; // Move Expiration time in mS
-      uint16_t SLET = 1500; // Single Look Expiration Time in mS
-      float PO = 0.41;
+      const uint8_t NOEM = 7;
+      uint16_t MET = 11250; // Move Expiration time in mS
+      uint16_t SLET = 1700; // Single Look Expiration Time in mS
+      float PO = 0.46;
 
     //Things You Might want to Change
       uint16_t Cal_Thresh = 5000; //How Long Calibration Lasts
